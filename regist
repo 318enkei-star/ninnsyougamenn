@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>参加受付・デジタル身分証</title>
+    <style>
+        * { touch-action: none; user-select: none; -webkit-user-select: none; box-sizing: border-box; }
+        body {
+            margin: 0; padding: 0; background: #1a1a1a; color: #fff;
+            font-family: 'Hiragino Kaku Gothic ProN', sans-serif; overflow: hidden;
+            width: 100vw; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        
+        .container { width: 90%; max-width: 400px; text-align: center; z-index: 10; }
+        h1 { color: #e67e22; font-size: 24px; margin-bottom: 20px; }
+        
+        /* セレクトボックスの装飾 */
+        .select-box {
+            width: 100%; padding: 15px; font-size: 18px; font-weight: bold;
+            background: #333; color: white; border: 2px solid #e67e22;
+            border-radius: 12px; margin-bottom: 20px; outline: none;
+            -webkit-appearance: none; appearance: none; text-align: center;
+        }
+        
+        .btn {
+            width: 100%; padding: 18px; font-size: 20px; font-weight: bold;
+            background: #e67e22; color: white; border: none; border-radius: 12px; cursor: pointer;
+            box-shadow: 0 4px 0 #a04000;
+        }
+        .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #a04000; }
+        .btn:disabled { opacity: 0.3; }
+
+        /* 身分証明書のカード風装飾 */
+        #id-card {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            border: 3px solid #e67e22; border-radius: 20px; padding: 25px;
+            text-align: left; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            margin-top: 20px; display: none; position: relative; overflow: hidden;
+        }
+        #id-card::before {
+            content: "ID CARD"; position: absolute; right: -15px; bottom: -10px;
+            font-size: 70px; font-weight: bold; color: rgba(255,255,255,0.03);
+        }
+        .card-title { font-size: 20px; font-weight: bold; color: #e67e22; border-bottom: 2px solid #e67e22; padding-bottom: 5px; margin-bottom: 15px; }
+        .card-row { margin-bottom: 12px; font-size: 16px; }
+        .card-label { font-size: 11px; color: #aaa; margin-bottom: 2px; }
+        .card-val { font-size: 18px; font-weight: bold; color: #f1c40f; }
+        
+        .status-msg { margin-top: 15px; font-size: 14px; color: #2ecc71; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div id="setup-area">
+        <h1>エージェント登録受付</h1>
+        <p style="font-size: 14px; color: #ccc; margin-bottom: 25px;">あなたの名前を選択して、<br>デジタル身分証を発行してください。</p>
+        
+        <select id="name-select" class="select-box">
+            <option value="">▼ 名前を選択してください</option>
+            <option value="エンドウ　ケイタ">エンドウ　ケイタ</option>
+            <option value="上原">上原</option>
+            
+        </select>
+        
+        <button id="issue-btn" class="btn" onclick="issueLicense()">身分証を発行する</button>
+    </div>
+
+    <div id="id-card">
+        <div class="card-title">DIGITAL LICENSE</div>
+        <div class="card-row">
+            <div class="card-label">NAME</div>
+            <div id="card-name" class="card-val">----</div>
+        </div>
+        <div class="card-row">
+            <div class="card-label">AGENT ID</div>
+            <div id="card-id" class="card-val">----</div>
+        </div>
+        <div class="card-row" style="margin-bottom: 0;">
+            <div class="card-label">STATUS</div>
+            <div style="color: #2ecc71; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 5px;">
+                🟢 認証完了 / 探索許可
+            </div>
+        </div>
+    </div>
+    
+    <div id="status-text" class="status-msg" style="display: none;"></div>
+</div>
+
+<script>
+    const GAME_ID = "yakiniku"; // 共通のゲーム識別キー
+
+    // 起動時にすでに身分証を持っているかチェック
+    window.addEventListener("DOMContentLoaded", () => {
+        const savedName = localStorage.getItem("event_user_name");
+        const savedId = localStorage.getItem("event_player_id"); // 👈ここが共通ID！
+
+        if (savedName && savedId) {
+            // すでに登録済みの場合は、即座に身分証を表示
+            showCard(savedName, savedId);
+        }
+    });
+
+    // 身分証の発行処理
+    function issueLicense() {
+        const nameSelect = document.getElementById("name-select");
+        const selectedName = nameSelect.value;
+        
+        if (!selectedName) {
+            alert("名前を選択してください！");
+            return;
+        }
+
+        document.getElementById("issue-btn").disabled = true;
+
+        // 1. あなただけの「イベント共通固有ID」をその場で生成
+        const newPlayerId = "U_" + Math.random().toString(36).substring(2, 7) + "_" + Date.now().toString().slice(-4);
+
+        // 2. スマホのブラウザ（LocalStorage）に強力に焼き付ける
+        localStorage.setItem("event_user_name", selectedName);
+        localStorage.setItem("event_player_id", newPlayerId); // 👈 これを50個のゲームで使い回す！
+
+        // 3. 演出としてカードを表示
+        showCard(selectedName, newPlayerId);
+        
+        const statusText = document.getElementById("status-text");
+        statusText.innerText = "✨ 身分証がウェブ上に登録されました！探索を開始してください。";
+        statusText.style.display = "block";
+    }
+
+    // カード表示への切り替え
+    function showCard(name, id) {
+        document.getElementById("setup-area").style.display = "none";
+        document.getElementById("card-name").innerText = name;
+        document.getElementById("card-id").innerText = id;
+        document.getElementById("id-card").style.display = "block";
+    }
+</script>
+</body>
+</html>
